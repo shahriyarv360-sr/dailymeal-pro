@@ -497,6 +497,42 @@ app.delete('/api/member/:id', auth, adminOnly, async (req, res) => {
     res.status(400).send({ error: e.message });
   }
 });
+// ================= MESS DATA (SYNC) =================
+
+// ১. সব ডাটা লোড করা (Meal, Bazar, Notice, Requests)
+app.get('/api/mess-data', auth, async (req, res) => {
+  try {
+    const mess = await Mess.findById(req.user.messId);
+    if (!mess) return res.status(404).send({ error: 'Mess not found' });
+    
+    res.send({
+      meals: mess.meals || {},
+      expenses: mess.expenses || [],
+      notices: mess.notices || [],
+      mealRequests: mess.mealRequests || [],
+      depositRequests: mess.depositRequests || []
+    });
+  } catch (e) { res.status(400).send({ error: e.message }); }
+});
+
+// ২. ডাটা আপডেট করা (Meal, Bazar, Notice, Requests)
+app.post('/api/mess-data', auth, async (req, res) => {
+  try {
+    const { meals, expenses, notices, mealRequests, depositRequests } = req.body;
+    const mess = await Mess.findById(req.user.messId);
+    if (!mess) return res.status(404).send({ error: 'Mess not found' });
+
+    // মেসে ডাটা আপডেট
+    if (meals) mess.meals = meals;
+    if (expenses) mess.expenses = expenses;
+    if (notices) mess.notices = notices;
+    if (mealRequests) mess.mealRequests = mealRequests;
+    if (depositRequests) mess.depositRequests = depositRequests;
+
+    await mess.save();
+    res.send({ success: true });
+  } catch (e) { res.status(400).send({ error: e.message }); }
+});
 
 // ================= 404 (Express 5 compatible) =================
 app.use((req, res, next) => {

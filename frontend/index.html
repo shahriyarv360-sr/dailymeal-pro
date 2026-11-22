@@ -1672,7 +1672,34 @@ async function syncMessMembers(){
     sv();
   }catch(e){ console.warn('Sync members failed', e); }
 }
+async function syncMessData() {
+  if (!useBackend()) return;
+  try {
+    const data = await apiCall('/mess-data');
+    if (data.meals && Object.keys(data.meals).length > 0) DB.meals = data.meals;
+    if (data.expenses) DB.expenses = data.expenses;
+    if (data.notices) DB.notices = data.notices;
+    if (data.mealRequests) DB.mealRequests = data.mealRequests;
+    if (data.depositRequests) DB.depositRequests = data.depositRequests;
+    sv(); 
+  } catch (e) { console.warn('Sync mess data failed', e); }
+}
 
+async function pushMessDataToServer() {
+  if (!useBackend()) return;
+  try {
+    await apiCall('/mess-data', {
+      method: 'POST',
+      body: {
+        meals: DB.meals,
+        expenses: DB.expenses,
+        notices: DB.notices,
+        mealRequests: DB.mealRequests,
+        depositRequests: DB.depositRequests
+      }
+    });
+  } catch (e) { console.warn('Push mess data failed', e); }
+}
 async function loadBazarRecords(){
   try{
     const records = await apiCall('/bazar');
@@ -1786,6 +1813,7 @@ function loginAs(user){
   document.getElementById('main-app').classList.remove('app-hidden');
   document.getElementById('bot-nav').style.display='flex';
   refreshAvatars();
+  syncMessData(); // 👈 এই নতুন লাইনটা যোগ করুন
   document.getElementById('pd-name').textContent=CU.name;
   document.getElementById('pd-email').textContent=showId(CU);
   const rL={super:'সুপার ইউজার',admin:'অ্যাডমিন',member:'সদস্য'};
@@ -2109,6 +2137,7 @@ function afterMealChange(){
   if(byId('sc-home').classList.contains('on')) renderHome();
   if(byId('sc-date').classList.contains('on')) renderDate();
   if(byId('sc-members').classList.contains('on')) renderMems();
+  pushMessDataToServer(); // 👈 এই নতুন লাইনটা যোগ করুন
 }
 function openMealPicker(uid,yr,mo,day){
   mpInit('modal',uid,yr,mo,day);
@@ -2278,6 +2307,7 @@ async function addNotice(){
       await apiCall('/notice', { method:'POST', body:{ title:t, body:b } });
     }
   } catch(e) { console.warn('Backend notice post failed', e); }
+  pushMessDataToServer(); // 👈 নতুন লাইন
   toast('নোটিশ পোস্ট হয়েছে');
 }
 function delNotice(id){DB.notices=DB.notices.filter(n=>n.id!==id);sv();renderNotices()}
@@ -2781,6 +2811,7 @@ async function saveBazar(){
     byId('bazar-save-modal').classList.add('open');
     byId('baz-image').value=''; byId('baz-file-name').textContent='রসিদের ছবি যোগ করুন (ঐচ্ছিক)';
     renderBazar(); updateHdr();
+    pushMessDataToServer();
     toast('বাজার সেভ হয়েছে ✓ — মিল রেট আপডেট হয়েছে');
   }catch(e){
     console.error(e); toast('সেভ ব্যর্থ: '+e.message,'error');

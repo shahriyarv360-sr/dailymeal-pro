@@ -19,11 +19,18 @@ const userSchema = new mongoose.Schema({
 const messSchema = new mongoose.Schema({
   name: { type: String, required: true },
   superAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  // মাস বন্ধের কাজের জন্য
+  
+  // পুরনো ফিল্ড
   meals: { type: Object, default: {} },
   expenses: { type: Array, default: [] },
   monthArchive: { type: Array, default: [] },
   closedMonths: { type: Object, default: {} },
+
+  // 👇 এই ৩টা নতুন লাইন যোগ করুন
+  notices: { type: Array, default: [] },
+  mealRequests: { type: Array, default: [] },
+  depositRequests: { type: Array, default: [] },
+
   createdAt: { type: Date, default: Date.now }
 });
 
