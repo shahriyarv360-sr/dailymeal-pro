@@ -1807,13 +1807,14 @@ function demoLogin(role){
 // ═══════════════════════════════════════════════════════════════
 //  LOGIN AS
 // ═══════════════════════════════════════════════════════════════
+
 function loginAs(user){
   CU=user;
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('main-app').classList.remove('app-hidden');
   document.getElementById('bot-nav').style.display='flex';
   refreshAvatars();
-  syncMessData(); // 👈 এই নতুন লাইনটা যোগ করুন
+  syncMessData(); 
   document.getElementById('pd-name').textContent=CU.name;
   document.getElementById('pd-email').textContent=showId(CU);
   const rL={super:'সুপার ইউজার',admin:'অ্যাডমিন',member:'সদস্য'};
@@ -1824,6 +1825,15 @@ function loginAs(user){
   document.getElementById('pd-share-link').style.display=CU.role==='super'?'flex':'none';
   ['mem-tools','date-search-wrap'].forEach(i=>{const e=byId(i); if(e) e.style.display='none'});
   buildTabNav(); goTab('home',null); updateHdr(); checkBalWarn();
+  
+  // অটো সিঙ্ক চালু
+  if (window._syncInterval) clearInterval(window._syncInterval);
+  window._syncInterval = setInterval(() => {
+    if (useBackend() && CU) {
+      syncMessData(); 
+      syncMessMembers();
+    }
+  }, 5000); 
 }
 
 function refreshAvatars(){const a=byId('av-ini'); if(a&&CU) a.innerHTML=avInner(CU)}
@@ -2310,11 +2320,15 @@ async function addNotice(){
   pushMessDataToServer(); // 👈 নতুন লাইন
   toast('নোটিশ পোস্ট হয়েছে');
 }
-function delNotice(id){DB.notices=DB.notices.filter(n=>n.id!==id);sv();renderNotices()}
-function noticeTargets(){
-  const t=byId('notice-target')?.value||'all';
-  return DB.users.filter(u=>u.id!==CU.id&&(t==='all'||String(u.id).replace(/[^\w-]/g,'')===t));
+// 👇 এইখানে নতুন কোডটা বসান
+function delNotice(id){
+  DB.notices=DB.notices.filter(n=>n.id!==id);
+  sv();
+  if(typeof renderNotices === 'function') renderNotices();
+  pushMessDataToServer(); // সার্ভারে ডিলিট আপডেট পাঠাবে
+  toast('নোটিশ ডিলিট হয়েছে');
 }
+
 function noticeInputs(){
   const title=byId('notice-title-inp').value.trim(), body=byId('notice-body-inp').value.trim();
   if(!title||!body){toast('শিরোনাম ও বিবরণ দিন','error');return null}
@@ -2346,6 +2360,7 @@ function submitDeposit(){
   sv();
   DB.users.filter(u=>isAdminU(u)).forEach(u=>addNotif(u.id,'💰 নতুন জমার রিকোয়েস্ট',CU.name+' ৳'+amt+' জমার অনুরোধ করেছেন ('+depMethod+').','info'));
   toast('রিকোয়েস্ট পাঠানো হয়েছে','info');
+  pushMessDataToServer(); // সিঙ্ক
 }
 function renderPendingDeps(){
   const reqs=(DB.depositRequests||[]).filter(r=>r.status==='pending');
@@ -2368,12 +2383,18 @@ function renderPendingDepBadge(){
   if(b){b.textContent=n;b.style.display=n?'inline-block':'none'}
   if(c){c.textContent='পেন্ডিং '+n;c.style.display=n?'inline-block':'none'}
 }
-function approveDeposit(id){
+async function approveDeposit(id){
   const r=DB.depositRequests.find(x=>x.id===id); if(!r||r.status!=='pending') return;
   r.status='approved';
   const u=DB.users.find(x=>x.id===r.uid); if(u) u.deposit=(u.deposit||0)+r.amt;
-  sv(); addNotif(r.uid,'✅ জমা অনুমোদিত!','আপনার ৳'+r.amt+' জমা অনুমোদন করা হয়েছে।','info');
-  toast(r.userName+'-এর ৳'+r.amt+' জমা অনুমোদিত'); renderPendingDeps(); updateHdr();
+  sv(); 
+  if (useBackend()) {
+    try { await apiCall(`/user/${r.uid}/deposit`, { method: 'PUT', body: { amount: r.amt } }); } catch(e) { console.warn(e); }
+  }
+  addNotif(r.uid,'✅ জমা অনুমোদিত!','আপনার ৳'+r.amt+' জমা অনুমোদন করা হয়েছে।','info');
+  toast(r.userName+'-এর ৳'+r.amt+' জমা অনুমোদিত'); 
+  renderPendingDeps(); updateHdr();
+  pushMessDataToServer();
 }
 function rejectDeposit(id){
   const r=DB.depositRequests.find(x=>x.id===id); if(!r||r.status!=='pending') return;

@@ -283,15 +283,17 @@ app.put('/api/user/role/:id', auth, async (req, res) => {
 });
 
 // Deposit (Admin adds to member)
-app.put('/api/user/:id/deposit', auth, adminOnly, async (req, res) => {
+app.put('/api/user/:id/deposit', auth, async (req, res) => {
   try {
-    const amount = Number(req.body.amount) || 0;
+    if (!['super_admin','admin_manager'].includes(req.user.role)) {
+      return res.status(403).send({ error: 'Forbidden' });
+    }
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).send({ error: 'User not found' });
     if (String(user.messId) !== String(req.user.messId)) {
       return res.status(403).send({ error: 'Not in your mess' });
     }
-    user.balance = (user.balance || 0) + amount;
+    user.balance = (user.balance || 0) + Number(req.body.amount || 0);
     await user.save();
     res.send(user);
   } catch (e) {
