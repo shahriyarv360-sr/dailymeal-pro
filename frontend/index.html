@@ -2258,6 +2258,7 @@ function approveMealReq(id){
   toast(r.userName+'-এর রিকোয়েস্ট অনুমোদিত');
   renderPendingMealReqs(); updateHdr(); renderHome();
   if(byId('sc-date').classList.contains('on')) renderDate();
+  pushMessDataToServer(); // 👈 এই লাইনটা যোগ করুন
 }
 function rejectMealReq(id){
   const r=DB.mealRequests.find(x=>x.id===id); if(!r||r.status!=='pending') return;
