@@ -1427,9 +1427,21 @@ function ownStatsHTML(){
 }
 function saveShowTotals(on){
   if(!isAdmin()){toast('শুধু অ্যাডমিন পরিবর্তন করতে পারবেন','error');return}
-  DB.showTotals=!!on; sv();
-  const l=byId('show-totals-label'); if(l) l.textContent=on?'চালু — সদস্যরা মোট হিসাব দেখতে পারছে':'বন্ধ — সদস্যরা শুধু নিজের হিসাব দেখে';
+  DB.showTotals=!!on; 
+  sv();
+  
+  const l=byId('show-totals-label'); 
+  if(l) l.textContent=on?'চালু — সদস্যরা মোট হিসাব দেখতে পারছে':'বন্ধ — সদস্যরা শুধু নিজের হিসাব দেখে';
+  
   toast(on?'এখন সদস্যরা মোট হিসাব দেখতে পারবে':'মোট হিসাব এখন শুধু আপনারা দেখবেন','info');
+  
+  // সার্ভারে সেভ করুন
+  if (useBackend()) {
+    apiCall('/mess-data', {
+      method: 'POST',
+      body: { showTotals: on }
+    }).catch(e => console.warn(e));
+  }
 }
 function avInner(u){return u&&u.profilePic?`<img src="${u.profilePic}" alt="">`:ini(u?u.name:'?')}
 function showId(u){return u?(u.email&&!/@mess\.local$/.test(u.email)?u.email:(u.username?'@'+u.username:'')):''}
@@ -2266,6 +2278,7 @@ function rejectMealReq(id){
   addNotif(r.uid,'❌ মিল রিকোয়েস্ট প্রত্যাখ্যাত','আপনার '+bn(r.day)+' '+MNS[r.mo]+' তারিখের মিল পরিবর্তনের অনুরোধ প্রত্যাখ্যাত হয়েছে।','warn');
   toast(r.userName+'-এর রিকোয়েস্ট প্রত্যাখ্যাত','info');
   renderPendingMealReqs();
+  pushMessDataToServer(); // সার্ভারে সেভ হবে
 }
 function renderAdminToday(){
   const {yr,mo}=DB, d=new Date().getDate();
@@ -2385,23 +2398,28 @@ function renderPendingDepBadge(){
   if(c){c.textContent='পেন্ডিং '+n;c.style.display=n?'inline-block':'none'}
 }
 async function approveDeposit(id){
-  const r=DB.depositRequests.find(x=>x.id===id); if(!r||r.status!=='pending') return;
+  const r=DB.depositRequests.find(x=>x.id===id); 
+  if(!r||r.status!=='pending') return;
+  
   r.status='approved';
-  const u=DB.users.find(x=>x.id===r.uid); if(u) u.deposit=(u.deposit||0)+r.amt;
+  const u=DB.users.find(x=>x.id===r.uid); 
+  if(u) u.deposit=(u.deposit||0)+r.amt;
   sv(); 
+
+  // সার্ভারে সেভ করুন
   if (useBackend()) {
-    try { await apiCall(`/user/${r.uid}/deposit`, { method: 'PUT', body: { amount: r.amt } }); } catch(e) { console.warn(e); }
+    try {
+      await apiCall(`/user/${r.uid}/deposit`, { method: 'PUT', body: { amount: r.amt } });
+    } catch(e) { console.warn('Backend deposit failed', e); }
   }
+  
+  pushMessDataToServer(); // মেস ডাটা সিঙ্ক (রিকোয়েস্ট রিমুভ হবে)
+  
   addNotif(r.uid,'✅ জমা অনুমোদিত!','আপনার ৳'+r.amt+' জমা অনুমোদন করা হয়েছে।','info');
   toast(r.userName+'-এর ৳'+r.amt+' জমা অনুমোদিত'); 
-  renderPendingDeps(); updateHdr();
-  pushMessDataToServer();
-}
-function rejectDeposit(id){
-  const r=DB.depositRequests.find(x=>x.id===id); if(!r||r.status!=='pending') return;
-  r.status='rejected'; sv();
-  addNotif(r.uid,'❌ জমা প্রত্যাখ্যাত','আপনার ৳'+r.amt+' জমার রিকোয়েস্ট প্রত্যাখ্যাত হয়েছে।','warn');
-  renderPendingDeps();
+  renderPendingDeps(); 
+  renderHome(); // ড্যাশবোর্ড আপডেট
+  updateHdr();
 }
 
 // ═══════════════════════════════════════════════════════════════
