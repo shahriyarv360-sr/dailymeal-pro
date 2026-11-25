@@ -3802,5 +3802,50 @@ byId('main-app').insertAdjacentHTML('beforeend','<div class="app-end-spacer"></d
 })();
 
 </script>
+<!-- ইনস্টল বাটন (শুরুতে হাইড থাকবে) -->
+<button id="pwa-install-btn" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:9999; background:linear-gradient(135deg,var(--green),var(--green2)); color:#fff; border:none; border-radius:20px; padding:12px 24px; font-family:inherit; font-size:14px; font-weight:700; box-shadow:0 4px 15px rgba(16,217,140,0.4); cursor:pointer; display:flex; align-items:center; gap:8px;">
+  <i class="ti ti-download" style="font-size:18px;"></i> অ্যাপ ইনস্টল করুন
+</button>
+
+<script>
+  let deferredPrompt;
+  const installBtn = document.getElementById('pwa-install-btn');
+
+  // ব্রাউজার ইনস্টল প্রম্পট দিতে চাইলে এই ইভেন্টটা ফায়ার হয়
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // বাটনটা শো করান
+    if(installBtn) installBtn.style.display = 'flex';
+  });
+
+  // ইনস্টল বাটনে ক্লিক করলে
+  if(installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      
+      // ব্রাউজারের ইনস্টল পপ-আপ দেখান
+      deferredPrompt.prompt();
+      
+      // ইউজার কী রেসপন্স দিল সেটা চেক করুন
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
+      
+      // প্রম্পট একবারই ব্যবহার করা যায়
+      deferredPrompt = null;
+      
+      // বাটন হাইড করুন
+      installBtn.style.display = 'none';
+    });
+  }
+
+  // অ্যাপ ইনস্টল হয়ে গেলে বাটনটা হাইড করে দিন
+  window.addEventListener('appinstalled', () => {
+    if(installBtn) installBtn.style.display = 'none';
+    deferredPrompt = null;
+    console.log('PWA was installed');
+  });
+</script>
 </body>
 </html>
