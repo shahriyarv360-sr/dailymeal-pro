@@ -1691,8 +1691,13 @@ async function syncMessData() {
     if (data.meals && Object.keys(data.meals).length > 0) DB.meals = data.meals;
     if (data.expenses) DB.expenses = data.expenses;
     if (data.notices) DB.notices = data.notices;
-    if (data.mealRequests) DB.mealRequests = data.mealRequests;
-    if (data.depositRequests) DB.depositRequests = data.depositRequests;
+    if (data.mealRequests) {
+      // 👇 সার্ভার থেকে আসা রিকোয়েস্টের মধ্যে শুধু pending গুলো রাখুন
+      DB.mealRequests = data.mealRequests.filter(r => r.status === 'pending');
+    }
+    if (data.depositRequests) {
+      DB.depositRequests = data.depositRequests.filter(r => r.status === 'pending');
+    }
     sv(); 
   } catch (e) { console.warn('Sync mess data failed', e); }
 }
