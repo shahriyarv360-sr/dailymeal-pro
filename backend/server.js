@@ -337,6 +337,14 @@ app.delete('/api/bazar/:id', auth, adminOnly, async (req, res) => {
   try {
     const b = await Bazar.findOne({ _id: req.params.id, messId: req.user.messId });
     if (!b) return res.status(404).send({ error: 'Not found' });
+    
+    // ডিলিট করার আগে খরচের লিস্ট থেকে বাদ দিন
+    const mess = await Mess.findById(req.user.messId);
+    if (mess) {
+      mess.expenses = (mess.expenses || []).filter(e => e.recId !== req.params.id);
+      await mess.save();
+    }
+    
     await Bazar.deleteOne({ _id: req.params.id });
     res.send({ success: true });
   } catch (e) {
