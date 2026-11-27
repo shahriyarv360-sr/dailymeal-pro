@@ -2461,24 +2461,40 @@ function chM(d){
   if(document.getElementById('sc-summary')?.classList.contains('on')) renderSummary();
   if(document.getElementById('sc-expense')?.classList.contains('on')) renderExpense();
 }
-function dateMatches(u,q){return !q||[u.name,u.email,u.phone,u.username,u.room].some(x=>String(x||'').toLowerCase().includes(q))}
 function renderDate(){
   const {yr,mo}=DB;
   const now=new Date(), td=now.getDate(), isNow=(now.getFullYear()===yr&&now.getMonth()===mo);
   byId('mn-title').textContent=MNF[mo]+' '+yr;
-  const sw=byId('date-search-wrap'); if(sw) sw.style.display=isAdmin()?'block':'none';
+  
+  const sw=byId('date-search-wrap'); 
+  if(sw) sw.style.display=isAdmin()?'block':'none';
+  
   const q=isAdmin()?(byId('date-search')?.value||'').trim().toLowerCase():'';
+  
   const noticeEl=byId('date-lock-notice');
   if(isCutoff()&&isNow){
     noticeEl.style.display='block';
     noticeEl.innerHTML=`<div class="lock-banner"><div class="lb-icon red"><i class="ti ti-clock"></i></div><div><div class="lb-title red">কাট-অফ সময় — ${cutoffLabel()}-এর পর</div><div class="lb-body">সদস্যরা আজকের মিল নিজে পরিবর্তন করতে পারবেন না।${isAdmin()?' অ্যাডমিন হিসেবে আপনি পারবেন।':''}</div></div></div>`;
-  } else { noticeEl.style.display='none' }
+  } else { 
+    noticeEl.style.display='none' 
+  }
 
   const days=new Date(yr,mo+1,0).getDate();
   const tbody=document.querySelector('#meal-tbl tbody');
-  if(!DB.users.length){tbody.innerHTML='<tr><td colspan="40"><div class="empty">কোনো সদস্য নেই</div></td></tr>';return}
+  
+  // 👇 এখানে চেক করুন DB.users খালি কিনা
+  if(!DB.users || DB.users.length === 0){
+    tbody.innerHTML='<tr><td colspan="40"><div class="empty">কোনো সদস্য লোড হয়নি। একটু অপেক্ষা করুন...</div></td></tr>';
+    // ১ সেকেন্ড পর আবার চেষ্টা করবে
+    setTimeout(() => { if(typeof syncMessMembers === 'function') syncMessMembers(); }, 1000);
+    return;
+  }
+
   const list=DB.users.map((m,i)=>({m,i})).filter(({m})=>dateMatches(m,q));
-  if(!list.length){tbody.innerHTML='<tr><td colspan="40"><div class="empty">কোনো সদস্য পাওয়া যায়নি</div></td></tr>';return}
+  if(!list.length){
+    tbody.innerHTML='<tr><td colspan="40"><div class="empty">কোনো সদস্য পাওয়া যায়নি</div></td></tr>';
+    return;
+  }
 
   let h=`<tr><th class="nth">#</th><th class="nameth">নাম</th>`;
   for(let d=1;d<=days;d++){
