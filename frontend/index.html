@@ -1698,10 +1698,12 @@ async function syncMessMembers(){
     DB.users = users.map(bu => mapBackendUser(bu));
     sv();
     
-    // 👇 ডাটা লোড হওয়ার পর স্ক্রিন রিফ্রেশ করা
-    if (typeof renderMems === 'function') renderMems();
-    if (typeof renderDate === 'function') renderDate();
-    if (typeof updateHdr === 'function') updateHdr();
+    // 👇 ডাটা লোড হওয়ার পর স্ক্রিন রিফ্রেশ করা (সেটTimeout দিয়ে)
+    setTimeout(() => {
+      if (typeof renderMems === 'function' && byId('sc-members').classList.contains('on')) renderMems();
+      if (typeof renderDate === 'function' && byId('sc-date').classList.contains('on')) renderDate();
+      if (typeof updateHdr === 'function') updateHdr();
+    }, 500); // ৫০০ মিলিসেকেন্ড অপেক্ষা করবে
     
   }catch(e){ 
     console.warn('Sync members failed', e); 
