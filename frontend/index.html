@@ -956,13 +956,14 @@ table.mt th.nameth{position:sticky;left:0;background:var(--bg2);z-index:3}
 </div>
 
 <!-- NOTIF PANEL -->
-<div class="notif-head">
-  <span>নোটিফিকেশন</span>
-  <div style="display:flex; gap:8px;">
-    <span class="notif-clear" onclick="clearNotifs()" style="color:var(--blue)">সব পড়া হয়েছে</span>
-    <span class="notif-clear" onclick="clearAllNotifs()" style="color:var(--red)">সব মুছুন</span>
+
+  <div class="notif-head">
+    <span>নোটিফিকেশন</span>
+    <div style="display:flex; gap:8px;">
+      <span class="notif-clear" onclick="clearNotifs()" style="color:var(--blue)">সব পড়া হয়েছে</span>
+      <span class="notif-clear" onclick="clearAllNotifs()" style="color:var(--red)">সব মুছুন</span>
+    </div>
   </div>
-</div>
 
 <!-- BOTTOM NAV -->
 <div class="bot-nav" id="bot-nav" style="display:none"></div>
@@ -1385,14 +1386,15 @@ function markEverOn(uid, yr, mo, day){
   const key=`${uid}_${yr}_${mo}_${day}`;
   if(!DB.mealLocks[key]) DB.mealLocks[key]=Date.now();
 }
-function getEditPerm(uid, yr, mo, day){
-  if(!CU) return 'past';
-  if(isPastDay(yr, mo, day)) return 'past';
-  if(isAdmin()) return 'free';
-  if(uid!==CU.id) return 'not_own';
-  if(isTodayDate(yr, mo, day) && isCutoff()) return 'cutoff';
-  if(gm(uid,yr,mo,day)!=='X') return 'once_on';
-  return 'free';
+function cellClick(uid,yr,mo,day){
+  const perm=getEditPerm(uid,yr,mo,day);
+  if(perm==='past'){pastClickMsg();return}
+  if(perm==='not_own'){toast('শুধু নিজের মিল পরিবর্তন করতে পারবেন','warn');return}
+  if(perm==='cutoff' || perm==='once_on'){ // 👈 এখানে once_on হলে রিকোয়েস্ট পেজে পাঠাবে
+    openReqModal(day, perm, gm(uid,yr,mo,day), yr, mo);
+    return;
+  }
+  openMealPicker(uid,yr,mo,day);
 }
 function gm(uid,yr,mo,d){return DB.meals[`${uid}_${yr}_${mo}_${d}`]||'X'}
 function applyMeal(uid, yr, mo, day, code){
@@ -1704,13 +1706,11 @@ async function syncMessData() {
     if (data.meals && Object.keys(data.meals).length > 0) DB.meals = data.meals;
     if (data.expenses) DB.expenses = data.expenses;
     if (data.notices) DB.notices = data.notices;
-    if (data.mealRequests) {
-      // 👇 সার্ভার থেকে আসা রিকোয়েস্টের মধ্যে শুধু pending গুলো রাখুন
-      DB.mealRequests = data.mealRequests.filter(r => r.status === 'pending');
-    }
-    if (data.depositRequests) {
-      DB.depositRequests = data.depositRequests.filter(r => r.status === 'pending');
-    }
+    
+    // 👇 এই দুই লাইন রিকোয়েস্টগুলো ফিল্টার করবে
+    if (data.mealRequests) DB.mealRequests = data.mealRequests.filter(r => r.status === 'pending');
+    if (data.depositRequests) DB.depositRequests = data.depositRequests.filter(r => r.status === 'pending');
+    
     sv(); 
   } catch (e) { console.warn('Sync mess data failed', e); }
 }
@@ -2804,6 +2804,7 @@ function addBazarTotal(){
   renderBazar(); toast(buyer+' — মোট ৳'+amt+' যোগ হয়েছে');
 }
 function removeBazarItem(id){DB.bazarDraft=(DB.bazarDraft||[]).filter(x=>x.id!==id);sv();renderBazar()}
+
 function renderBazarHistory(){
   const el=byId('bazar-history-list'), count=byId('bazar-history-count');
   const records=DB.bazarRecords||[];
@@ -2816,21 +2817,25 @@ function renderBazarHistory(){
     const buyers=(r.buyers||[]).join(', ')||'—';
     const items=(r.items||[]).map(i=>escapeHtmlText(i.itemName)+(i.totalCost?' ৳'+Math.round(i.totalCost):'')).join(' · ');
     return `<div class="bh-row">
-      <div class="bh-top"><span class="d">${dateStr}</span><span class="b">${escapeHtmlText(buyers)}</span><span class="a">৳${(r.totalBazarCost||0).toFixed(0)}</span>
-      ${isAdmin()&&r.local?`<button class="del-btn" onclick="deleteBazarRecord('${r._id}')"><i class="ti ti-trash"></i></button>`:''}</div>
+      <div class="bh-top">
+        <span class="d">${dateStr}</span>
+        <span class="b">${escapeHtmlText(buyers)}</span>
+        <span class="a">৳${(r.totalBazarCost||0).toFixed(0)}</span>
+        ${isAdmin() ? `<button class="del-btn" onclick="deleteBazarRecord('${r._id}')"><i class="ti ti-trash"></i></button>` : ''}
+      </div>
       ${items?`<div class="bh-items">${items}</div>`:''}
       ${r.image?`<img class="bh-img" src="${r.image}" alt="রসিদ">`:''}
     </div>`;
   }).join('');
 }
 async function deleteBazarRecord(id){
-  const r=(DB.bazarRecords||[]).find(x=>x._id===id); if(!r) return;
-  const d=new Date(r.date);
-  if(isMonthClosed(d.getFullYear(),d.getMonth())){toast('এই মাস বন্ধ — মুছা যাবে না','error');return}
-  if(!await askConfirm('এই বাজার রেকর্ড মুছবেন? খরচের হিসাব থেকেও বাদ যাবে।')) return;
-  DB.bazarRecords=DB.bazarRecords.filter(x=>x._id!==id);
-  DB.expenses=(DB.expenses||[]).filter(e=>e.recId!==id);
-  sv(); renderBazar(); updateHdr(); toast('রেকর্ড মুছে ফেলা হয়েছে');
+  if(!confirm('এই বাজার রেকর্ড মুছবেন?')) return;
+  if(useBackend()) {
+    try { await apiCall('/bazar/'+id, { method: 'DELETE' }); } catch(e) { console.warn(e); }
+  }
+  DB.bazarRecords = DB.bazarRecords.filter(x=>x._id!==id);
+  sv(); renderBazar(); 
+  toast('রেকর্ড মুছে ফেলা হয়েছে');
 }
 async function saveBazar(){
   const draft=DB.bazarDraft||[];
@@ -3089,17 +3094,36 @@ function renderGasMembers(){
   const c=gasCalc();
   const fEl=document.getElementById('gas-filter');
   const el=document.getElementById('gas-members');
+  
+  // কাউন্ট ঠিক করা
   const cnt={all:c.rows.length,paid:c.paidRows.length,due:c.dueRows.length,refund:c.refundRows.length};
-  if(!canSeeTotals()){ gasFilter='all'; }
-  fEl.innerHTML=[['all','সবাই','f-all'],['paid','দিয়েছে','f-paid'],['due','বাকি আছে','f-due'],['refund','ফেরত পাবে','f-refund']]
-    .map(([k,l,c2])=>`<button class="gas-chip ${c2}${gasFilter===k?' active':''}" onclick="setGasFilter('${k}')">${l} (${cnt[k]})</button>`).join('');
-  if(!canSeeTotals()) fEl.innerHTML='';
-  if(c.tBill<=0||!DB.users.length){el.innerHTML='<div class="empty">গ্যাস বিল ও সদস্য যোগ করুন</div>';return}
+  
+  if(!canSeeTotals()){ 
+    gasFilter='all'; 
+    fEl.innerHTML='';
+  } else {
+    fEl.innerHTML=[['all','সবাই','f-all'],['paid','দিয়েছে','f-paid'],['due','বাকি আছে','f-due'],['refund','ফেরত পাবে','f-refund']]
+      .map(([k,l,c2])=>`<button class="gas-chip ${c2}${gasFilter===k?' active':''}" onclick="setGasFilter('${k}')">${l} (${cnt[k]})</button>`).join('');
+  }
+  
+  if(c.tBill<=0||!DB.users.length){
+    el.innerHTML='<div class="empty">গ্যাস বিল ও সদস্য যোগ করুন</div>';
+    return;
+  }
+  
+  // সব রো নিয়ে আসা
   let list=c.rows.filter(r=>canSeeTotals()||r.m.id===CU.id).sort((a,b)=>b.due-a.due);
+  
+  // ফিল্টার লজিক
   if(gasFilter==='paid') list=list.filter(r=>r.due<=0.01);
   else if(gasFilter==='due') list=list.filter(r=>r.due>0.01);
   else if(gasFilter==='refund') list=list.filter(r=>r.due<-0.01);
-  if(!list.length){el.innerHTML='<div class="empty">এই তালিকায় কেউ নেই</div>';return}
+  
+  if(!list.length){
+    el.innerHTML='<div class="empty">এই তালিকায় কেউ নেই</div>';
+    return;
+  }
+  
   el.innerHTML=list.map(({m,i,paid,due})=>{
     const avc=avC(i), in2=ini(m.name), perM=c.perM;
     const pct=perM>0?Math.min(100,paid/perM*100).toFixed(0):0;
