@@ -1409,6 +1409,9 @@ function applyMeal(uid, yr, mo, day, code){
   if(isAdmin() && uid!==CU.id && before!==code){
     addNotif(uid,'🍽️ মিল পরিবর্তন',bn(day)+' '+MNS[mo]+' তারিখের মিল অ্যাডমিন "'+mealName(code)+'" করেছেন।','info');
   }
+   setTimeout(() => { 
+    if (typeof renderDate === 'function') renderDate(); 
+  }, 100); 
   return true;
 }
 function memMeals(uid,yr,mo){const d=new Date(yr,mo+1,0).getDate();let t=0;for(let i=1;i<=d;i++)t+=mealVal(gm(uid,yr,mo,i));return Math.round(t*100)/100}
@@ -2183,11 +2186,22 @@ function mpSave(p){
   afterMealChange();
 }
 function afterMealChange(){
-  updateHdr(); checkBalWarn();
+  updateHdr(); 
+  checkBalWarn();
+  
+  // হোম স্ক্রিন আপডেট
   if(byId('sc-home').classList.contains('on')) renderHome();
+  
+  // তারিখ স্ক্রিন আপডেট (মিল পরিবর্তনের পর সাথে সাথে দেখানোর জন্য)
   if(byId('sc-date').classList.contains('on')) renderDate();
+  
+  // মেম্বার স্ক্রিন আপডেট
   if(byId('sc-members').classList.contains('on')) renderMems();
-  pushMessDataToServer(); // 👈 এই নতুন লাইনটা যোগ করুন
+  
+  // সার্ভারে সিঙ্ক করুন
+  if (typeof pushMessDataToServer === 'function') {
+    pushMessDataToServer();
+  }
 }
 function openMealPicker(uid,yr,mo,day){
   mpInit('modal',uid,yr,mo,day);
